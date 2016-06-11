@@ -28,7 +28,12 @@ start_link() ->
 
 %% Child :: {Id,StartFunc,Restart,Shutdown,Type,Modules}
 init([]) ->
-    {ok, { {one_for_all, 0, 1}, []} }.
+    Beb = {beb, {beb, start_link, []},
+	  temporary,
+	  2000,
+	  worker,
+	  [learner]},
+    {ok, { {one_for_all, 5, 1}, [Beb]} }.
 
 %%====================================================================
 %% Internal functions

@@ -1,16 +1,16 @@
 {application, atomic_register,
- [{description, "An OTP application"},
+ [{description, "Atomic register, multiple writers"},
   {vsn, "0.1.0"},
-  {registered, []},
+  {registered, [atomic_register_sup, beb]},
   {mod, { atomic_register_app, []}},
   {applications,
    [kernel,
     stdlib
    ]},
   {env,[]},
-  {modules, []},
+  {modules, [atomic_register_sup, beb]},
 
-  {maintainers, []},
+  {maintainers, ['Antonios Kouzoupis']},
   {licenses, []},
   {links, []}
  ]}.
