@@ -1,14 +1,14 @@
 {application, atomic_register,
  [{description, "Atomic register, multiple writers"},
   {vsn, "0.1.0"},
-  {registered, [atomic_register_sup, beb]},
+  {registered, [atomic_register_sup, beb, atomic_register]},
   {mod, { atomic_register_app, []}},
   {applications,
    [kernel,
     stdlib
    ]},
   {env,[]},
-  {modules, [atomic_register_sup, beb]},
+  {modules, [atomic_register_sup, beb, atomic_register]},
 
   {maintainers, ['Antonios Kouzoupis']},
   {licenses, []},

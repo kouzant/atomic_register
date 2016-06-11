@@ -3,7 +3,7 @@
 -behaviour(gen_server).
 
 %% Public API
--export([start/0, start_link/0, bcast/1, stop/0]).
+-export([start/0, start_link/0, broadcast/1, stop/0]).
 
 %% Server API
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -15,8 +15,8 @@
 -define(BEB_NAME, beb).
 
 %% Public API
-bcast(Msg) ->
-    gen_server:cast(?BEB_NAME, {bcast, {beb_req, Msg, self()}}).
+broadcast(Msg) ->
+    gen_server:cast(?BEB_NAME, {bcast, Msg}).
 
 stop() ->
     gen_server:stop(?BEB_NAME).
@@ -49,9 +49,17 @@ handle_call(_Request, _From, State) ->
 
 handle_cast({bcast, Msg}, State) ->
     io:format("Received request to bcast~n"),
-    gen_server:abcast(State#beb_state.nodes, ?BEB_NAME, Msg),
+    bcast(Msg, State),
     {noreply, State};
-handle_cast({beb_req, Msg, From}, State) ->
-    io:format("Received bcast msg from ~p: ~p~n", [From, Msg]),
+handle_cast({ar_seq, Key, From}, State) ->
+    io:format("Received request for highest sequence number~n"),
+    %% Inform Atomic Register
+    send2ar({ar_seq, Key, From}),
     {noreply, State}.
 
+%% Private functions
+bcast(Msg, State) ->
+    gen_server:abcast(State#beb_state.nodes, ?BEB_NAME, Msg).
+
+send2ar(Msg) ->
+    gen_server:cast(ar, Msg).
