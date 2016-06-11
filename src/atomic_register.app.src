@@ -9,7 +9,6 @@
    ]},
   {env,[]},
   {modules, [atomic_register_sup, beb, atomic_register]},
-
   {maintainers, ['Antonios Kouzoupis']},
   {licenses, []},
   {links, []}
