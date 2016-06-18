@@ -2,6 +2,8 @@
 
 -behaviour(gen_server).
 
+-include_lib("atomic_register/include/ar_def.hrl").
+
 %% Public API
 -export([start/0, start_link/0, broadcast/1, stop/0]).
 
@@ -11,8 +13,6 @@
 -record(beb_state, {
 	  nodes :: [node()]
 	 }).
-
--define(BEB_NAME, beb).
 
 %% Public API
 broadcast(Msg) ->
@@ -67,4 +67,4 @@ bcast(Msg, State) ->
     gen_server:abcast(State#beb_state.nodes, ?BEB_NAME, Msg).
 
 send2ar(Msg) ->
-    gen_server:cast(ar, Msg).
+    gen_server:cast(?REG_NAME, Msg).

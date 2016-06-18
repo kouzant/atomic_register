@@ -2,8 +2,10 @@
 
 -behaviour(gen_server).
 
+-include_lib("atomic_register/include/ar_def.hrl").
+
 %% Public API
--export([start/0, start_link/0, write/2]).
+-export([start/0, start_link/0, write/3]).
 
 %% Server API
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -14,10 +16,9 @@
 -record(reg_state, {write_attempt :: {string(), string(), integer(), [integer()]},
 		    state :: atom(),
 		    store :: [{string(), string(), integer()}],
+		    client :: {pid(), reference()},
 		    majority :: integer()
 		   }).
-
--define(REG_NAME, ar).
 
 %% Public API
 start() ->
@@ -26,12 +27,12 @@ start() ->
 start_link() ->
     gen_server:start_link({local, ?REG_NAME}, ?MODULE, [], []).
 
-write(Key, Value) ->
-    gen_server:cast(?REG_NAME, {ar_write_init, Key, Value}).
+write(Key, Value, Client) ->
+    gen_server:cast(?REG_NAME, {ar_write_init, Key, Value, Client}).
 
 %% Callback functions
 init(_Args) ->
-    InitState = #reg_state{state=init,majority=1,store=[]},
+    InitState = #reg_state{state=init,majority=1,store=[], client={}},
     {ok, InitState}.
 
 terminate(normal, _State) ->
@@ -49,12 +50,12 @@ handle_info(Info, State) ->
 handle_call(_Msg, _From, State) ->
     {reply, reply, State}.
 
-handle_cast({ar_write_init, Key, Value}, State) ->
+handle_cast({ar_write_init, Key, Value, Client}, State) ->
     %% Read from majority to get highest sequence number for that key
     beb:broadcast({ar_seq, Key, self()}),
     %% Init the state for this write attempt
     Attempt = {Key, Value, 0, []},
-    NewState = State#reg_state{state=seq_reply, write_attempt = Attempt},
+    NewState = State#reg_state{state=seq_reply, write_attempt = Attempt, client=Client},
     {noreply, NewState};
 
 handle_cast({ar_seq, Key, From}, State) ->
@@ -118,8 +119,21 @@ handle_cast({ar_write_req_quorum, Key, Value, Sequence, From}, State) ->
 	    {noreply, State#reg_state{store=NewStore}}
     end;
 
-handle_cast({ar_write_req_quorum_ack}, State) ->
+handle_cast({ar_write_req_quorum_ack}, State) when State#reg_state.state =:= write_phase ->
     io:format("ACK for writing~n"),
+    Majority = State#reg_state.majority,
+    {K, V, Resps, S} = State#reg_state.write_attempt,
+    case Resps + 1 < Majority of
+	true ->
+	    {noreply, State#reg_state{write_attempt={K, V, Resps + 1, S}}};
+	false ->
+	    {Pid, Ref} = State#reg_state.client,
+	    Pid ! {ar_write_complete, Ref},
+	    {noreply, State#reg_state{state=init, write_attempt={}}}
+    end;
+
+handle_cast({ar_write_req_quorum_ack}, State) ->
+    io:format("Received write ACK but I already have quorum~n"),
     {noreply, State}.
 	    
 %% Private functions
