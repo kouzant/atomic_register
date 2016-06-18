@@ -55,7 +55,12 @@ handle_cast({ar_seq, Key, From}, State) ->
     io:format("Received request for highest sequence number~n"),
     %% Inform Atomic Register
     send2ar({ar_seq, Key, From}),
+    {noreply, State};
+handle_cast({ar_write_req_quorum, Key, Value, Sequence, From}, State) ->
+    io:format("Received write request!~n"),
+    send2ar({ar_write_req_quorum, Key, Value, Sequence, From}),
     {noreply, State}.
+
 
 %% Private functions
 bcast(Msg, State) ->

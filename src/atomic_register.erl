@@ -10,8 +10,11 @@
 
 %% write_attempt: {Key, Value, num_of_resp, seqs}
 %% store: key, value, sequence number
+%% majority: the majority of the quorum
 -record(reg_state, {write_attempt :: {string(), string(), integer(), [integer()]},
-		    store :: [{string(), string(), integer()}]
+		    state :: atom(),
+		    store :: [{string(), string(), integer()}],
+		    majority :: integer()
 		   }).
 
 -define(REG_NAME, ar).
@@ -28,7 +31,7 @@ write(Key, Value) ->
 
 %% Callback functions
 init(_Args) ->
-    InitState = #reg_state{store=[]},
+    InitState = #reg_state{state=init,majority=1,store=[]},
     {ok, InitState}.
 
 terminate(normal, _State) ->
@@ -49,15 +52,10 @@ handle_call(_Msg, _From, State) ->
 handle_cast({ar_write_init, Key, Value}, State) ->
     %% Read from majority to get highest sequence number for that key
     beb:broadcast({ar_seq, Key, self()}),
-    
-    {noreply, State};
-
-%% Wait for majority
-handle_cast({ar_seq_reply, Key, Seq}, State) ->
-    io:format("Received sequence number: ~p~n", [Seq]),
-    %% If num of sequence numbers received >= majority
-    %% continue with the second phase
-    {noreply, State};
+    %% Init the state for this write attempt
+    Attempt = {Key, Value, 0, []},
+    NewState = State#reg_state{state=seq_reply, write_attempt = Attempt},
+    {noreply, NewState};
 
 handle_cast({ar_seq, Key, From}, State) ->
     Store = State#reg_state.store,
@@ -67,8 +65,63 @@ handle_cast({ar_seq, Key, From}, State) ->
 	{not_found} ->
 	    gen_server:cast(From, {ar_seq_reply, Key, 0})
     end,
-    {noreply, State}.
+    {noreply, State};
 
+%% Wait for majority
+handle_cast({ar_seq_reply, Key, Seq}, State) when State#reg_state.state =:= seq_reply ->
+    io:format("Received sequence number: ~p~n", [Seq]),
+    Majority = State#reg_state.majority,
+    io:format("Majority is: ~p~n", [Majority]),
+    {Key, Value, Resps, Seqs} = State#reg_state.write_attempt,
+    io:format("For the key ~p, I have received so far ~p seq~n", [Key, Resps]),
+    %% If num of sequence numbers received >= majority
+    %% continue with the second phase
+    NewSeqs = [Seq | Seqs],
+    case Resps + 1 < Majority of
+	true ->
+	    {noreply, State#reg_state{write_attempt={Key, Value, Resps + 1, NewSeqs}}};
+	false ->
+	    %% Continue with the second phase
+	    Sequence = lists:max(NewSeqs) + 1,
+	    gen_server:cast(?REG_NAME, {ar_write_phase, Key, Value, Sequence}),
+	    {noreply, State#reg_state{state=write_phase}}
+    end;
+
+handle_cast({ar_seq_reply, _, _}, State) ->
+    io:format("Received sequence number reply but I have the quorum~n"),
+    {noreply, State};
+
+handle_cast({ar_write_phase, Key, Value, Sequence}, State)
+  when State#reg_state.state =:= write_phase->
+    io:format("I can continue writing {~p,~p} with seq num ~p~n", [Key, Value, Sequence]),
+    %% bcast and wait for majority for the write request
+    beb:broadcast({ar_write_req_quorum, Key, Value, Sequence, self()}),
+    %% Update the record if present
+    {noreply, State#reg_state{write_attempt={Key, Value, 0, []}}};
+
+handle_cast({ar_write_req_quorum, Key, Value, Sequence, From}, State) ->
+    Store = State#reg_state.store,
+    case get_value(Key, Store) of
+	{ok, {Key, _Value, Seq}} when Sequence > Seq ->
+	    io:format("Replacing key: ~p with seq ~p~n", [Key, Sequence]),
+	    NewStore = lists:keyreplace(Key, 1, Store, {Key, Value, Sequence}),
+	    gen_server:cast(From, {ar_write_req_quorum_ack}),
+	    {noreply, State#reg_state{store=NewStore}};
+	{ok, {Key, _Value, Seq}} when Sequence =< Seq->
+	    io:format("Ignoring key ~p~n", [Key]),
+	    gen_server:cast(From, {ar_write_req_quorum_ack}),
+	    {noreply, State};
+	{not_found} ->
+	    io:format("Adding key ~p with seq ~p~n", [Key, Sequence]),
+	    NewStore = [{Key, Value, Sequence} | Store],
+	    gen_server:cast(From, {ar_write_req_quorum_ack}),
+	    {noreply, State#reg_state{store=NewStore}}
+    end;
+
+handle_cast({ar_write_req_quorum_ack}, State) ->
+    io:format("ACK for writing~n"),
+    {noreply, State}.
+	    
 %% Private functions
 get_value(Key, [{Key, Value, Seq} | _Xs]) ->
     {ok, {Key, Value, Seq}};
