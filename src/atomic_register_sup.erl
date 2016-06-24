@@ -37,7 +37,7 @@ init([]) ->
 	 transient,
 	 2000,
 	 worker,
-	 [atomic_register, majority]},
+	 [atomic_register]},
     {ok, { {rest_for_one, 5, 1}, [Beb, Ar]} }.
 
 %%====================================================================
