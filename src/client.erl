@@ -16,6 +16,8 @@ read(Key) ->
     atomic_register:read(Key, {self(), Ref}),
     receive
 	{ar_attempt_complete, Ref, K, V} ->
-	    io:format("Value for key ~p is: ~p~n", [K, V])
+	    io:format("Value for key ~p is: ~p~n", [K, V]);
+	{ar_read_not_found, Ref, K} ->
+	    io:format("Key ~p does not exist!~n", [K])
     end.
 			  

@@ -114,8 +114,8 @@ handle_cast({ar_seq_reply, Key, RecvValue, Seq}, State)
 	    {noreply, State#reg_state{read_attempt = {Key, Resps + 1, NewRecvValues}}};
 	false ->
 	    [{V, S} | _] = lists:reverse(lists:ukeysort(2, NewRecvValues)),
-	    gen_server:cast(?REG_NAME, {ar_write_phase, Key, V, S}),
-	    {noreply, State#reg_state{state=write_phase}}
+	    NewState = handle_read_majority(Key, V, S, State),
+	    {noreply, NewState}
     end;
 
 handle_cast({ar_seq_reply, _, _, _}, State) ->
@@ -173,4 +173,13 @@ get_value(Key, [{_, _, _} | Xs]) ->
     get_value(Key, Xs);
 get_value(_Key, []) ->
     {not_found}.
+
+handle_read_majority(Key, null, _Seq, State) ->
+    {Pid, Ref} = State#reg_state.client,
+    Pid ! {ar_read_not_found, Ref, Key},
+    State#reg_state{state=init, read_attempt={}};
+
+handle_read_majority(Key, Value, Seq, State) ->
+    gen_server:cast(?REG_NAME, {ar_write_phase, Key, Value, Seq}),
+    State#reg_state{state=write_phase}.
 
