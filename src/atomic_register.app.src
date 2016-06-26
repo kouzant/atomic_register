@@ -7,8 +7,10 @@
    [kernel,
     stdlib
    ]},
-  {env,[]},
-  {modules, [atomic_register_sup, beb, atomic_register]},
+  {env,[
+	{nodes, ['node0@finwe', 'node1@finwe', 'node2@finwe']}
+       ]},
+  {modules, [atomic_register_sup, beb, atomic_register, utils]},
   {maintainers, ['Antonios Kouzoupis']},
   {licenses, []},
   {links, []}

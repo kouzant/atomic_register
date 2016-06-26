@@ -5,7 +5,7 @@
 -include_lib("atomic_register/include/ar_def.hrl").
 
 %% Public API
--export([start/0, start_link/0, broadcast/1, stop/0]).
+-export([start/0, start_link/1, broadcast/1, stop/0]).
 
 %% Server API
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -24,12 +24,12 @@ stop() ->
 start() ->
     gen_server:start({local, ?BEB_NAME}, ?MODULE, [], []).
 
-start_link() ->
-    gen_server:start_link({local, ?BEB_NAME}, ?MODULE, [], []).
+start_link(Nodes) ->
+    gen_server:start_link({local, ?BEB_NAME}, ?MODULE, Nodes, []).
 
 %% Callbacks
-init(_Args) ->
-    State = #beb_state{nodes = ['ble@finwe', 'bla@finwe']},
+init(Nodes) ->
+    State = #beb_state{nodes = Nodes},
     {ok, State}.
 
 terminate(normal, _State) ->

@@ -5,7 +5,7 @@
 -include_lib("atomic_register/include/ar_def.hrl").
 
 %% Public API
--export([start/0, start_link/0, write/3, read/2]).
+-export([start/0, start_link/1, write/3, read/2]).
 
 %% Server API
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -28,8 +28,8 @@
 start() ->
     gen_server:start({local, ?REG_NAME}, ?MODULE, [], []).
 
-start_link() ->
-    gen_server:start_link({local, ?REG_NAME}, ?MODULE, [], []).
+start_link(Majority) ->
+    gen_server:start_link({local, ?REG_NAME}, ?MODULE, Majority, []).
 
 write(Key, Value, Client) ->
     gen_server:cast(?REG_NAME, {ar_write_init, Key, Value, Client}).
@@ -38,8 +38,8 @@ read(Key, Client) ->
     gen_server:cast(?REG_NAME, {ar_read_init, Key, Client}).
 
 %% Callback functions
-init(_Args) ->
-    InitState = #reg_state{state=init,majority=1,store=[], client={}},
+init(Majority) ->
+    InitState = #reg_state{state = init, majority = Majority, store = [], client = {}},
     {ok, InitState}.
 
 terminate(normal, _State) ->

@@ -28,12 +28,13 @@ start_link() ->
 
 %% Child :: {Id,StartFunc,Restart,Shutdown,Type,Modules}
 init([]) ->
-    Beb = {beb, {beb, start_link, []},
+    {Majority, Nodes} = utils:load_config(),
+    Beb = {beb, {beb, start_link, [Nodes]},
 	  transient,
 	  2000,
 	  worker,
 	  [beb]},
-    Ar = {ar, {atomic_register, start_link, []},
+    Ar = {ar, {atomic_register, start_link, [Majority]},
 	 transient,
 	 2000,
 	 worker,
