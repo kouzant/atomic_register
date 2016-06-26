@@ -48,19 +48,17 @@ handle_call(_Request, _From, State) ->
     {noreply, State}.
 
 handle_cast({bcast, Msg}, State) ->
-    io:format("Received request to bcast~n"),
     bcast(Msg, State),
     {noreply, State};
+
+%% TODO: Squash them to a single function
 handle_cast({ar_seq, Key, From}, State) ->
-    io:format("Received request for highest sequence number~n"),
     %% Inform Atomic Register
     send2ar({ar_seq, Key, From}),
     {noreply, State};
 handle_cast({ar_write_req_quorum, Key, Value, Sequence, From}, State) ->
-    io:format("Received write request!~n"),
     send2ar({ar_write_req_quorum, Key, Value, Sequence, From}),
     {noreply, State}.
-
 
 %% Private functions
 bcast(Msg, State) ->
